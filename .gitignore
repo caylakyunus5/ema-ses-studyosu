@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 *.wav
 .cache/
+*.onnx
+node_modules/
+package*.json
+fixtures*.json
+fixtures*.npz
