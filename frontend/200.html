@@ -67,6 +67,16 @@ textarea:focus{outline:none;border-color:var(--acc1);box-shadow:0 0 0 3px rgba(1
 .chip:hover{color:var(--txt);border-color:var(--acc1)}
 
 .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-top:18px}
+.emogrid{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.emo{font-size:13.5px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;transition:all .15s}
+.emo:hover{border-color:#3d4a7d;color:var(--txt)}
+.emo.sel{border-color:var(--acc2);background:rgba(245,158,11,.13);color:var(--txt);font-weight:600}
+.punct{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13.5px;color:var(--dim);cursor:pointer;user-select:none}
+.punct input{accent-color:var(--acc1);width:16px;height:16px;cursor:pointer}
+.normbox{margin-top:12px;background:#0d1226;border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:13.5px;color:var(--dim);display:none}
+.normbox.show{display:block}
+.normbox b{color:var(--txt)}
+.ctrl-head{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-top:16px;margin-bottom:8px}
 .ctrl label{font-size:13px;color:var(--dim);display:flex;justify-content:space-between;margin-bottom:8px}
 .ctrl label b{color:var(--txt)}
 input[type=range]{width:100%;accent-color:var(--acc1);height:22px}
@@ -142,6 +152,10 @@ footer a:hover{text-decoration:underline}
           <button class="chip" data-ex="Dikkat dikkat! 12,5 kilogram elma ve 3 şişe süt, 5 dakika içinde kapınıza teslim edilecektir. İyi günler dileriz!">🛒 Sipariş</button>
         </div>
       </div>
+      <div class="ctrl-head">Duygu tonu</div>
+      <div class="emogrid" id="emoGrid"></div>
+      <label class="punct"><input type="checkbox" id="punctFix" checked> Noktalama işaretlerini otomatik düzelt <span id="punctNote" style="color:var(--ok);font-size:12px"></span></label>
+      <div class="normbox" id="normBox"></div>
       <div class="controls">
         <div class="ctrl">
           <label>Konuşma hızı <b id="speedVal">1.00×</b></label>
@@ -183,7 +197,7 @@ footer a:hover{text-decoration:underline}
     Model ve ağırlıklar: <b>Canberk Aslan</b>, Apache-2.0 ·
     <a href="https://huggingface.co/canberkkkkkk/ema-lightning" target="_blank" rel="noopener">Model kartı</a> ·
     Metin normalizasyonu ilhamı: <a href="https://github.com/erdemtuna/normalizer-tr" target="_blank" rel="noopener">normalizer-tr</a><br>
-    <span style="opacity:.75">Sesler, orijinal model sesinden tarayıcı içi perde/tempo işleme ile türetilir.
+    <span style="opacity:.75">Sesler, orijinal model sesinden tarayıcı içi <b>perde + formant</b> motoru ve duygu katmanıyla türetilir.
     Model: <a href="https://huggingface.co/yunus2441/ema-lightning-onnx" target="_blank" rel="noopener">ONNX portu</a> ·
     Kod: <a href="https://github.com/caylakyunus5/ema-ses-studyosu" target="_blank" rel="noopener">GitHub</a></span>
   </footer>
@@ -198,15 +212,9 @@ const MODEL_FILES = ["text_stage.onnx", "sound_stage.onnx", "decoder.onnx"];
 /* ====================================================================== */
 
 const $ = id => document.getElementById(id);
-const VOICES = [
-  {id:"elif",   name:"Elif",   emoji:"🌸", tag:"Orijinal kadın", pitch:0,    tempo:1.0,  seed:7},
-  {id:"deniz",  name:"Deniz",  emoji:"🌊", tag:"Derin erkek",    pitch:-5,   tempo:0.98, seed:11},
-  {id:"kerem",  name:"Kerem",  emoji:"⚡", tag:"Genç erkek",     pitch:-2.5, tempo:1.04, seed:5},
-  {id:"zeynep", name:"Zeynep", emoji:"✨", tag:"Parlak kadın",   pitch:2.5,  tempo:1.0,  seed:3},
-  {id:"minik",  name:"Minik",  emoji:"🎈", tag:"Çocuk",          pitch:6,    tempo:1.1,  seed:21},
-  {id:"radyo",  name:"Radyo",  emoji:"🎙️", tag:"Anlatıcı",       pitch:-1.5, tempo:0.92, seed:13},
-];
-const state = {voice: localStorage.emaVoice || "elif", words: [], lastSeed: 7, lastKey: "", blobUrl: null, engine: null, busy: false};
+const VOICES = Object.values(EMA_ENGINE.VOICES);
+const EMOTIONS = Object.values(EMA_ENGINE.EMOTIONS);
+const state = {voice: localStorage.emaVoice || "elif", emotion: localStorage.emaEmo || "notr", words: [], lastSeed: 7, lastKey: "", blobUrl: null, engine: null, busy: false};
 const audio = new Audio();
 
 function setStatus(msg, isErr){ const s=$("status"); s.textContent=msg; s.className="status"+(isErr?" err":""); }
@@ -279,13 +287,51 @@ function buildVoices() {
 }
 function draw(){ document.querySelectorAll(".vcard").forEach((el,i)=>el.classList.toggle("sel", VOICES[i].id===state.voice)); }
 
+/* duygu seçici */
+(function buildEmotions(){
+  const g = $("emoGrid");
+  for (const e of EMOTIONS) {
+    const b = document.createElement("button");
+    b.className = "emo" + (e === EMA_ENGINE.EMOTIONS[state.emotion] ? " sel" : "");
+    b.textContent = `${e.emoji} ${e.label}`;
+    b.dataset.id = Object.keys(EMA_ENGINE.EMOTIONS).find(k => EMA_ENGINE.EMOTIONS[k] === e);
+    b.onclick = () => { state.emotion = b.dataset.id; localStorage.emaEmo = b.dataset.id;
+      document.querySelectorAll(".emo").forEach(x => x.classList.toggle("sel", x === b)); updateNormPreview(); };
+    g.appendChild(b);
+  }
+})();
+function currentEmotion(){ return EMA_ENGINE.EMOTIONS[state.emotion] || EMA_ENGINE.EMOTIONS.notr; }
+
+/* noktalama + normalizasyon önizleme */
+function applyPunctFix(silent){
+  const el = $("txt");
+  const before = el.value;
+  if (!$("punctFix").checked || !before.trim()) return before;
+  const after = EMA_ENGINE.fixPunctuation(before);
+  if (after !== before) {
+    el.value = after;
+    $("counter").textContent = after.length + " / 600";
+    if (!silent) { $("punctNote").textContent = "✓ düzeltildi"; setTimeout(() => $("punctNote").textContent = "", 2500); }
+  }
+  return el.value;
+}
+function updateNormPreview(){
+  const el = $("txt");
+  const t = el.value.trim();
+  if (!t || !state.engine) { $("normBox").classList.remove("show"); return; }
+  const fixed = $("punctFix").checked ? EMA_ENGINE.fixPunctuation(t) : t;
+  const norm = state.engine.normalize(fixed);
+  if (norm) { $("normBox").innerHTML = "🗣️ <b>Modelin okuyacağı hâl:</b> " + norm; $("normBox").classList.add("show"); }
+  else $("normBox").classList.remove("show");
+}
+
 const pvCache = {};
 async function preview(v, btn) {
   if (state.busy) return;
   if (pvCache[v.id]) { playUrl(pvCache[v.id]); return; }
   btn.classList.add("loading"); btn.textContent = "⏳ Üretiliyor…";
   try {
-    const url = await synth(`Merhaba! Ben ${v.name}. EMA Ses Stüdyosu'na hoş geldiniz.`, v, 1, 0, null, () => {});
+    const url = await synth(`Merhaba! Ben ${v.name}. EMA Ses Stüdyosu'na hoş geldiniz.`, v, 1, 0, null, EMA_ENGINE.EMOTIONS.neseli, () => {});
     pvCache[v.id] = url; playUrl(url);
   } catch (e) { setStatus("Önizleme üretilemedi: " + e.message, true); }
   btn.classList.remove("loading"); btn.textContent = "▶ Dinle";
@@ -293,9 +339,9 @@ async function preview(v, btn) {
 function playUrl(url){ state.blobUrl = url; audio.src = url; audio.play(); }
 
 /* ---------------- sentez ---------------- */
-async function synth(text, voice, speed, pitch, seed, onProg) {
+async function synth(text, voice, speed, pitch, seed, emotion, onProg) {
   let result = null;
-  for await (const ev of state.engine.synthesize(text, {voice, speed, pitch, seed})) {
+  for await (const ev of state.engine.synthesize(text, {voice, speed, pitch, seed, emotion})) {
     if (ev.type === "progress") onProg(ev.done);
     else result = ev;
   }
@@ -308,18 +354,20 @@ async function synth(text, voice, speed, pitch, seed, onProg) {
 
 async function generate(randomSeed) {
   if (state.busy) return;
-  const text = $("txt").value.trim();
+  const text = applyPunctFix(false).trim();
+  updateNormPreview();
   if (!text) { setStatus("Lütfen önce bir metin yazın.", true); return; }
   const voice = VOICES.find(v => v.id === state.voice);
+  const emotion = currentEmotion();
   const speed = parseFloat($("speed").value), pitch = parseFloat($("pitch").value);
-  const key = JSON.stringify([text, voice.id, speed, pitch]);
+  const key = JSON.stringify([text, voice.id, speed, pitch, state.emotion]);
   const seed = randomSeed ? (Math.random() * 1e9) | 0 : (state.lastKey === key ? state.lastSeed : null);
   state.busy = true;
   $("go").disabled = true;
   const t0 = Date.now();
   try {
     setStatus("⏳ Ses üretiliyor…");
-    await synth(text, voice, speed, pitch, seed, p => setStatus(`⏳ Üretiliyor… %${(p*100).toFixed(0)}`));
+    await synth(text, voice, speed, pitch, seed, emotion, p => setStatus(`⏳ Üretiliyor… %${(p*100).toFixed(0)}`));
     state.lastKey = key; state.lastSeed = state.lastResult.seed;
     const d = state.lastResult;
     state.words = d.words;
@@ -334,6 +382,7 @@ async function generate(randomSeed) {
 
 function showResult(d, secs) {
   const voice = VOICES.find(v => v.id === state.voice);
+  const emo = currentEmotion();
   setStatus(`✅ Hazır! ${d.text.length} karakter, ${secs.toFixed(1)} sn'de üretildi.`);
   $("result").classList.add("show");
   $("tdur").textContent = fmt(d.duration);
@@ -346,6 +395,7 @@ function showResult(d, secs) {
   });
   $("stats").innerHTML = `
     <span class="stat">Ses: <b>${voice.emoji} ${voice.name}</b></span>
+    <span class="stat">Duygu: <b>${emo.emoji} ${emo.label}</b></span>
     <span class="stat">Süre: <b>${d.duration.toFixed(1)} sn</b></span>
     <span class="stat">Örnekleme: <b>${d.sampleRate/1000} kHz</b></span>
     <span class="stat">Tohum: <b>${d.seed}</b></span>
@@ -371,7 +421,8 @@ $("go").onclick = () => generate(false);
 $("dice").onclick = () => generate(true);
 
 /* ---------------- küçük parçalar ---------------- */
-$("txt").oninput = e => $("counter").textContent = e.target.value.length + " / 600";
+$("txt").oninput = e => { $("counter").textContent = e.target.value.length + " / 600"; clearTimeout(window._npT); window._npT = setTimeout(updateNormPreview, 500); };
+document.querySelector(".punct").addEventListener("change", updateNormPreview);
 document.querySelectorAll(".chip").forEach(c => c.onclick = () => { $("txt").value = c.dataset.ex; $("counter").textContent = c.dataset.ex.length + " / 600"; });
 $("speed").oninput = e => $("speedVal").textContent = parseFloat(e.target.value).toFixed(2) + "×";
 $("pitch").oninput = e => { const v = parseFloat(e.target.value); $("pitchVal").textContent = (v>0?"+":"")+v; };
