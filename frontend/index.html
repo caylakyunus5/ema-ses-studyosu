@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMA Ses Stüdyosu ⚡ Türkçe Metinden Sese</title>
+<meta name="description" content="EMA Lightning tabanlı çoklu sesli Türkçe metin-konuşma stüdyosu">
+<style>
+:root{
+  --bg:#0b0e1a; --bg2:#11162b; --card:#161d36; --card2:#1c2443;
+  --line:#2a3560; --txt:#eef1ff; --dim:#9aa5d1;
+  --acc1:#8b5cf6; --acc2:#f59e0b; --ok:#34d399; --err:#f87171;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",sans-serif;
+  background:radial-gradient(1200px 600px at 80% -10%,rgba(139,92,246,.18),transparent 60%),
+             radial-gradient(900px 500px at 10% 110%,rgba(245,158,11,.10),transparent 60%),var(--bg);
+  color:var(--txt);min-height:100vh;
+}
+.wrap{max-width:980px;margin:0 auto;padding:24px 18px 60px}
+header{text-align:center;padding:34px 0 26px}
+h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.5px}
+h1 .bolt{background:linear-gradient(120deg,var(--acc1),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);margin-top:10px;font-size:15px}
+.badges{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.badge{font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim)}
+.badge b{color:var(--txt)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.dot.warm{background:var(--acc2);box-shadow:0 0 8px var(--acc2)}
+.dot.err{background:var(--err)}
+
+h2{font-size:15px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin:34px 0 14px;display:flex;align-items:center;gap:10px}
+h2::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* Ses kartları */
+.voices{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px}
+.vcard{position:relative;background:var(--card);border:2px solid var(--line);border-radius:16px;padding:16px 14px 12px;cursor:pointer;transition:all .18s ease;text-align:center}
+.vcard:hover{transform:translateY(-3px);border-color:#3d4a7d;background:var(--card2)}
+.vcard.sel{border-color:var(--acc1);background:linear-gradient(160deg,rgba(139,92,246,.18),rgba(139,92,246,.05));box-shadow:0 8px 30px rgba(139,92,246,.25)}
+.vcard .avatar{font-size:34px;line-height:1;filter:drop-shadow(0 3px 8px rgba(0,0,0,.4))}
+.vcard .vname{font-weight:700;margin-top:8px;font-size:16px}
+.vcard .vtag{font-size:12px;color:var(--dim);margin-top:2px}
+.vcard .check{position:absolute;top:8px;right:10px;color:var(--acc1);font-size:14px;opacity:0;transition:opacity .15s}
+.vcard.sel .check{opacity:1}
+.pvbtn{margin-top:10px;font-size:12px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--txt);cursor:pointer;width:100%;transition:background .15s}
+.pvbtn:hover{background:rgba(139,92,246,.25)}
+.pvbtn.loading{opacity:.6;cursor:wait}
+
+/* Editör */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px}
+textarea{width:100%;min-height:130px;resize:vertical;background:#0d1226;border:1px solid var(--line);border-radius:12px;color:var(--txt);padding:14px 16px;font-size:16px;line-height:1.6;font-family:inherit}
+textarea:focus{outline:none;border-color:var(--acc1);box-shadow:0 0 0 3px rgba(139,92,246,.2)}
+.meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12.5px;color:var(--dim);flex-wrap:wrap;gap:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer}
+.chip:hover{color:var(--txt);border-color:var(--acc1)}
+
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-top:18px}
+.ctrl label{font-size:13px;color:var(--dim);display:flex;justify-content:space-between;margin-bottom:8px}
+.ctrl label b{color:var(--txt)}
+input[type=range]{width:100%;accent-color:var(--acc1);height:22px}
+
+.go{width:100%;margin-top:20px;padding:16px;font-size:17px;font-weight:700;border:none;border-radius:14px;color:#fff;cursor:pointer;
+   background:linear-gradient(120deg,var(--acc1),#6d28d9);transition:transform .12s,box-shadow .2s;box-shadow:0 8px 25px rgba(139,92,246,.35)}
+.go:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 32px rgba(139,92,246,.45)}
+.go:disabled{opacity:.55;cursor:wait}
+.status{margin-top:14px;font-size:14px;color:var(--dim);text-align:center;min-height:20px}
+.status.err{color:var(--err)}
+
+/* Sonuç */
+.result{margin-top:26px;display:none}
+.result.show{display:block;animation:fade .4s ease}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.player{display:flex;align-items:center;gap:16px;background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.playbtn{width:58px;height:58px;min-width:58px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--acc1),var(--acc2));color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s}
+.playbtn:hover{transform:scale(1.06)}
+.pinfo{flex:1}
+.pbar{height:7px;background:#0d1226;border-radius:99px;overflow:hidden;cursor:pointer;margin:8px 0 6px}
+.pfill{height:100%;width:0%;background:linear-gradient(90deg,var(--acc1),var(--acc2));border-radius:99px;transition:width .12s linear}
+.ptimes{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+.pactions{display:flex;gap:8px}
+.abtn{font-size:13px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--txt);cursor:pointer}
+.abtn:hover{border-color:var(--acc1)}
+.karaoke{margin-top:16px;background:#0d1226;border:1px solid var(--line);border-radius:14px;padding:18px;font-size:18px;line-height:2.1}
+.word{padding:2px 5px;border-radius:7px;transition:all .12s;cursor:pointer;color:var(--dim)}
+.word:hover{background:rgba(139,92,246,.2)}
+.word.now{background:linear-gradient(120deg,var(--acc1),var(--acc2));color:#fff;font-weight:600;box-shadow:0 2px 12px rgba(245,158,11,.4)}
+.statline{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.stat{font-size:12px;color:var(--dim);border:1px solid var(--line);padding:5px 11px;border-radius:999px}
+.stat b{color:var(--txt)}
+
+footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);color:var(--dim);font-size:13px;line-height:1.8;text-align:center}
+footer a{color:#b7a5ff;text-decoration:none}
+footer a:hover{text-decoration:underline}
+.spin{display:inline-block;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(max-width:560px){.karaoke{font-size:16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="bolt">⚡ EMA</span> Ses Stüdyosu</h1>
+    <p class="sub">EMA Lightning tabanlı yapay zekâ ile Türkçe metni doğal konuşmaya dönüştürün — 6 farklı sesle.</p>
+    <div class="badges">
+      <span class="badge"><span class="dot warm" id="srvDot"></span><span id="srvTxt">Sunucu kontrol ediliyor…</span></span>
+      <span class="badge">Model: <b>EMA Lightning</b> · 8.6M</span>
+      <span class="badge">Dil: <b>Türkçe</b></span>
+    </div>
+  </header>
+
+  <h2>1 · Ses Seçin</h2>
+  <div class="voices" id="voiceGrid"></div>
+
+  <h2>2 · Metninizi Yazın</h2>
+  <div class="panel">
+    <textarea id="txt" maxlength="600" placeholder="Seslendirmek istediğiniz metni buraya yazın… Örneğin: Merhaba! Bugün hava çok güzel, değil mi?"></textarea>
+    <div class="meta">
+      <span id="counter">0 / 600</span>
+      <div class="chips">
+        <button class="chip" data-ex="Merhaba! EMA Ses Stüdyosu'na hoş geldiniz. Bugün sizin için neler yapabilirim?">👋 Karşılama</button>
+        <button class="chip" data-ex="Bugün 18 Ekim 2026. Saat 14:30'da 1.250 TL tutarındaki ödemeniz hesabınıza yatırılacaktır.">💳 Bildirim</button>
+        <button class="chip" data-ex="Sabahın erken saatlerinde liman henüz uyanmamıştı. Balıkçılar ağlarını sessizce topluyor, martılar teknelerin etrafında dönüyordu.">📖 Hikâye</button>
+        <button class="chip" data-ex="Dikkat dikkat! 12,5 kilogram elma ve 3 şişe süt, 5 dakika içinde kapınıza teslim edilecektir. İyi günler dileriz!">🛒 Sipariş</button>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctrl">
+        <label>Konuşma hızı <b id="speedVal">1.00×</b></label>
+        <input type="range" id="speed" min="0.6" max="1.5" step="0.05" value="1">
+      </div>
+      <div class="ctrl">
+        <label>Perde ayarı <b id="pitchVal">±0</b></label>
+        <input type="range" id="pitch" min="-4" max="4" step="0.5" value="0">
+      </div>
+      <div class="ctrl">
+        <label>Varyasyon <b>🎲</b></label>
+        <button class="abtn" id="dice" style="width:100%">Aynı ses, farklı okuma</button>
+      </div>
+    </div>
+    <button class="go" id="go">⚡ Seslendir</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="result" id="result">
+    <h2>3 · Dinleyin</h2>
+    <div class="player">
+      <button class="playbtn" id="playBtn">▶</button>
+      <div class="pinfo">
+        <div class="pbar" id="pbar"><div class="pfill" id="pfill"></div></div>
+        <div class="ptimes"><span id="tcur">0:00</span><span id="tdur">0:00</span></div>
+      </div>
+      <div class="pactions">
+        <button class="abtn" id="dl">⬇ WAV indir</button>
+        <button class="abtn" id="again">🔁 Yeni varyasyon</button>
+      </div>
+    </div>
+    <div class="karaoke" id="karaoke"></div>
+    <div class="statline" id="stats"></div>
+  </div>
+
+  <footer>
+    <b>EMA Ses Stüdyosu</b> — açık kaynak <a href="https://github.com/canberk7/ema-lightning" target="_blank" rel="noopener">EMA Lightning</a> modeli üzerine kurulmuştur.<br>
+    Model ve ağırlıklar: <b>Canberk Aslan</b>, Apache-2.0 lisansı ·
+    <a href="https://huggingface.co/canberkkkkkk/ema-lightning" target="_blank" rel="noopener">Model kartı</a> ·
+    Metin normalizasyonu: <a href="https://github.com/erdemtuna/normalizer-tr" target="_blank" rel="noopener">normalizer-tr</a><br>
+    <span style="opacity:.7">Sesler, orijinal model sesinden perde/tempo işleme ile türetilmiştir. Backend: Render · Frontend: Surge</span>
+  </footer>
+</div>
+
+<script>
+/* ============================== AYAR ============================== */
+const API = "https://ema-ses-studyosu-api.onrender.com";  // Render backend
+/* ================================================================== */
+
+const $ = id => document.getElementById(id);
+const state = {voice: localStorage.emaVoice || "elif", words: [], lastSeed: null, lastReq: null, blobUrl: null};
+const audio = new Audio();
+
+let VOICES = [];
+async function api(path, opts = {}, retries = 2) {
+  for (let i = 0; ; i++) {
+    try {
+      const r = await fetch(API + path, opts);
+      if (!r.ok) {
+        let msg = "Sunucu hatası (" + r.status + ")";
+        try { const j = await r.json(); if (j.detail) msg = j.detail; } catch(e) {}
+        throw new Error(msg);
+      }
+      return await r.json();
+    } catch (e) {
+      if (i >= retries) throw e;
+      await new Promise(res => setTimeout(res, 2500));
+    }
+  }
+}
+
+/* ---------- ses kartları ---------- */
+async function loadVoices() {
+  try {
+    VOICES = await api("/api/voices", {}, 0);
+  } catch(e) {
+    // sunucu uyanıyor olabilir: health bekleyip tekrar dene
+    await waitServer();
+    VOICES = await api("/api/voices");
+  }
+  const g = $("voiceGrid"); g.innerHTML = "";
+  for (const v of VOICES) {
+    const el = document.createElement("div");
+    el.className = "vcard" + (v.id === state.voice ? " sel" : "");
+    el.innerHTML = `<span class="check">✔</span>
+      <div class="avatar">${v.emoji}</div>
+      <div class="vname">${v.name}</div>
+      <div class="vtag">${v.tag}</div>
+      <button class="pvbtn">▶ Dinle</button>`;
+    el.onclick = () => { state.voice = v.id; localStorage.emaVoice = v.id; draw(); stopAudio(); };
+    const btn = el.querySelector(".pvbtn");
+    btn.onclick = ev => { ev.stopPropagation(); preview(v, btn); };
+    g.appendChild(el);
+  }
+  setSrv(true);
+}
+function draw() {
+  document.querySelectorAll(".vcard").forEach((el, i) =>
+    el.classList.toggle("sel", VOICES[i] && VOICES[i].id === state.voice));
+}
+
+/* ---------- önizleme ---------- */
+const pvCache = {};
+async function preview(v, btn) {
+  if (pvCache[v.id]) { playUrl(pvCache[v.id]); return; }
+  btn.classList.add("loading"); btn.textContent = "⏳ Hazırlanıyor…";
+  try {
+    const d = await postTTS({text: v.sample_text, voice: v.id});
+    const url = b64ToUrl(d.audio);
+    pvCache[v.id] = url;
+    playUrl(url);
+  } catch (e) { setStatus("Önizleme alınamadı: " + e.message, true); }
+  btn.classList.remove("loading"); btn.textContent = "▶ Dinle";
+}
+function playUrl(url) { audio.src = url; audio.play(); $("playBtn").textContent = "⏸"; }
+
+/* ---------- ana üretim ---------- */
+async function postTTS(body) {
+  return api("/api/tts", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+}
+
+let genTimer = null;
+async function generate(randomSeed = false) {
+  const text = $("txt").value.trim();
+  if (!text) { setStatus("Lütfen önce bir metin yazın.", true); return; }
+  const body = {
+    text, voice: state.voice,
+    speed: parseFloat($("speed").value),
+    pitch: parseFloat($("pitch").value),
+  };
+  if (randomSeed) body.seed = Math.floor(Math.random() * 1e9);
+  else if (state.lastReq && JSON.stringify(state.lastReq) === JSON.stringify(body)) body.seed = state.lastSeed;
+
+  $("go").disabled = true;
+  setStatus("⏳ Ses üretiliyor…");
+  const t0 = Date.now();
+  genTimer = setTimeout(() => setStatus("⏳ Sunucu uyanıyor olabilir — Render ücretsiz planı ilk istekte 30-60 saniye sürebilir, lütfen bekleyin…"), 7000);
+  try {
+    const d = await postTTS(body);
+    state.lastReq = body; state.lastSeed = d.seed; state.words = d.words;
+    if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
+    state.blobUrl = b64ToUrl(d.audio);
+    showResult(d);
+  } catch (e) {
+    setStatus("❌ " + e.message + " — lütfen tekrar deneyin.", true);
+  }
+  clearTimeout(genTimer);
+  $("go").disabled = false;
+}
+
+function b64ToUrl(b64) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([arr], {type: "audio/wav"}));
+}
+
+function showResult(d) {
+  setStatus(`✅ Hazır! ${d.chars} karakter, ${d.elapsed_ms < 200 ? "önbellekten" : (d.elapsed_ms/1000).toFixed(1) + " sn'de"} üretildi.`);
+  $("result").classList.add("show");
+  audio.src = state.blobUrl;
+  $("tdur").textContent = fmt(d.duration);
+  // karaoke
+  const k = $("karaoke"); k.innerHTML = "";
+  state.words.forEach((w, i) => {
+    const s = document.createElement("span");
+    s.className = "word"; s.textContent = w.text;
+    s.onclick = () => { audio.currentTime = w.start + 0.01; audio.play(); };
+    k.appendChild(s);
+    k.appendChild(document.createTextNode(" "));
+  });
+  const v = VOICES.find(x => x.id === d.voice) || {};
+  $("stats").innerHTML = `
+    <span class="stat">Ses: <b>${v.emoji || ""} ${v.name || d.voice}</b></span>
+    <span class="stat">Süre: <b>${d.duration.toFixed(1)} sn</b></span>
+    <span class="stat">Örnekleme: <b>${d.sample_rate/1000} kHz</b></span>
+    <span class="stat">Tohum: <b>${d.seed}</b></span>
+    <span class="stat">Kelime: <b>${d.words.length}</b></span>`;
+  $("result").scrollIntoView({behavior: "smooth", block: "nearest"});
+  audio.play();
+}
+
+/* ---------- oynatıcı + karaoke ---------- */
+function stopAudio(){ audio.pause(); }
+function fmt(s){ const m=Math.floor(s/60), ss=Math.floor(s%60); return m+":"+String(ss).padStart(2,"0"); }
+$("playBtn").onclick = () => { if (audio.paused) { audio.play(); } else { audio.pause(); } };
+audio.onplay = () => $("playBtn").textContent = "⏸";
+audio.onpause = () => $("playBtn").textContent = "▶";
+audio.ontimeupdate = () => {
+  if (audio.duration) {
+    $("pfill").style.width = (audio.currentTime/audio.duration*100) + "%";
+    $("tcur").textContent = fmt(audio.currentTime);
+  }
+  const t = audio.currentTime;
+  let cur = -1;
+  for (let i = 0; i < state.words.length; i++) if (t >= state.words[i].start - 0.02) cur = i; else break;
+  document.querySelectorAll(".word").forEach((el, i) => el.classList.toggle("now", i === cur));
+};
+$("pbar").onclick = e => {
+  const r = $("pbar").getBoundingClientRect();
+  if (audio.duration) audio.currentTime = (e.clientX - r.left)/r.width * audio.duration;
+};
+$("dl").onclick = () => {
+  const a = document.createElement("a");
+  a.href = state.blobUrl; a.download = `ema-${state.voice}-${Date.now()}.wav`; a.click();
+};
+$("again").onclick = () => generate(true);
+$("go").onclick = () => generate(false);
+$("dice").onclick = () => generate(true);
+
+/* ---------- küçük parçalar ---------- */
+$("txt").oninput = e => $("counter").textContent = e.target.value.length + " / 600";
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+  $("txt").value = c.dataset.ex; $("counter").textContent = c.dataset.ex.length + " / 600";
+});
+$("speed").oninput = e => $("speedVal").textContent = parseFloat(e.target.value).toFixed(2) + "×";
+$("pitch").oninput = e => { const v = parseFloat(e.target.value); $("pitchVal").textContent = (v>0?"+":"") + v; };
+$("txt").addEventListener("keydown", e => { if ((e.ctrlKey||e.metaKey) && e.key === "Enter") generate(false); });
+
+function setStatus(msg, isErr) {
+  const s = $("status"); s.textContent = msg; s.className = "status" + (isErr ? " err" : "");
+}
+function setSrv(ok) {
+  $("srvDot").className = "dot " + (ok ? "ok" : "err");
+  $("srvTxt").textContent = ok ? "Sunucu çevrimiçi" : "Sunucu kapalı";
+}
+async function waitServer() {
+  $("srvDot").className = "dot warm";
+  $("srvTxt").textContent = "Sunucu uyanıyor…";
+  for (let i = 0; i < 40; i++) {
+    try { const r = await fetch(API + "/api/health"); if (r.ok) return; } catch(e) {}
+    await new Promise(res => setTimeout(res, 3000));
+  }
+}
+
+loadVoices();
+</script>
+</body>
+</html>
